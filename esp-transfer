@@ -1,0 +1,263 @@
+#include <LiquidCrystal_I2C.h>
+int value = 0;
+#include <WiFi.h>
+#include <Password.h>
+#include <Keypad.h>
+
+
+const char* ssid     = "Orange-Tekwill";
+const char* password1 = "";
+
+const char* host = "172.31.116.57";
+
+#define armed 1
+#define disable 0
+int freq = 2000;
+int channel = 0;
+int resolution = 8;
+#define piezoPin 13
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+int a = 9;
+int securitate = 1;
+#include <Password.h>
+#include <Keypad.h>
+
+Password password = Password( "1234" );
+
+const byte ROWS = 4; // Four rows
+const byte COLS = 4; //  columns
+// Define the Keymap
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rowPins[ROWS] = { 15, 2, 0, 4 };
+byte colPins[COLS] = { 16, 17, 5, 18 };
+
+
+// Create the Keypad
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+
+void setup() {
+
+  ledcSetup(channel, freq, resolution);
+  ledcAttachPin(13, channel);
+  keypad.addEventListener(keypadEvent);
+  lcd.init();
+
+
+  lcd.backlight();
+   Serial.begin(115200);
+    delay(10);
+
+    // We start by connecting to a WiFi network
+
+    Serial.println();
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+
+    WiFi.begin(ssid, password1);
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+
+
+
+
+
+
+}
+
+
+void transsfer(int argument){
+  delay(1000);
+    
+
+    Serial.print("connecting to ");
+    Serial.println(host);
+
+    // Use WiFiClient class to create TCP connections
+    WiFiClient client;
+    const int httpPort = 80;
+    if (!client.connect(host, httpPort)) {
+        Serial.println("connection failed");
+        return;
+    }
+
+    // We now create a URI for the request
+    String url = "/?securitate=";
+    url+=argument;
+    Serial.print("Requesting URL: ");
+    Serial.println(url);
+
+    // This will send the request to the server
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: close\r\n\r\n");
+    unsigned long timeout = millis();
+    while (client.available() == 0) {
+        if (millis() - timeout > 5000) {
+            Serial.println(">>> Client Timeout !");
+            client.stop();
+            return;
+        }
+    }
+
+    // Read all the lines of the reply from server and print them to Serial
+    while(client.available()) {
+        String line = client.readStringUntil('\r');
+        Serial.print(line);
+    }
+
+    Serial.println();
+    Serial.println("closing connection");
+  
+  }
+
+
+
+void loop() {
+  lcd.setCursor(0, 0);
+  lcd.print("Password :");
+
+  if (securitate == armed ) {
+    lcd.setCursor(0, 1);
+    lcd.print("Disable");
+  }
+  else {
+    lcd.setCursor(0, 1);
+    lcd.print("Armed");
+  }
+
+
+  keypad.getKey();
+}
+
+//take care of some special events
+void keypadEvent(KeypadEvent eKey) {
+  switch (keypad.getState()) {
+
+    case PRESSED:
+
+      ledcWriteTone(channel, 1000);
+      delay(100);
+      ledcWrite(channel, 0);
+
+
+      if (a == 14) {
+        a = 10;
+      }
+      if (eKey == 'A' or eKey == 'B' or eKey == 'C' or eKey == 'D' or eKey == '*' or eKey == '#') {
+        a = 10;
+      }
+      else {
+        lcd.setCursor(a, 0);
+        lcd.print('*');
+        a += 1;
+      }
+      switch (eKey) {
+
+        case '*': checkPassword(); break;
+        case '#': password.reset();
+
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Password :");
+
+          break;
+        default: password.append(eKey);
+      }
+  }
+}
+int aa;
+void checkPassword() {
+  a = 9;
+  if (password.evaluate()) {
+    lcd.clear();
+    lcd.setCursor(5, 0);
+    lcd.print("Correct");
+    if (securitate == armed ) {
+      securitate = disable ;
+      aa = 10;
+      while (aa > 0) {
+        lcd.clear();
+        lcd.setCursor(5, 1);
+        lcd.print(aa);
+       
+        ledcWriteTone(channel, 2000);
+        delay(200);
+         ledcWriteTone(channel, 0);
+         delay(800);
+        aa--;
+      }
+      transsfer(1);
+    }
+    else {
+      
+      securitate = armed;
+transsfer(0);
+    }
+
+
+
+    ledcWriteTone(channel, 2000);
+    delay(100);
+    ;
+    ledcWriteTone(channel, 2100);
+    delay(100);
+
+    ledcWriteTone(channel, 2900);
+    delay(100);
+
+    ledcWriteTone(channel, 1000);
+    delay(100);
+
+    ledcWriteTone(channel, 2800);
+    delay(100);
+    ledcWrite(channel, 0);
+    delay(2000);
+    lcd.clear();
+
+
+    for (int i = 0; i < 2; i++) {
+
+    }
+  } else {
+    lcd.clear();
+
+    lcd.setCursor(3, 0);
+    lcd.print("Incorrect");
+
+
+    ledcWriteTone(channel, 2000);
+    delay(500);
+    ;
+    ledcWriteTone(channel, 2200);
+    delay(300);
+
+    ledcWriteTone(channel, 2000);
+    delay(500);
+
+    ledcWriteTone(channel, 2200);
+    delay(300);
+
+    ledcWriteTone(channel, 2000);
+    delay(500);
+    ledcWrite(channel, 0);
+    delay(2000);
+    lcd.clear();
+
+
+  }
+}
