@@ -1,0 +1,565 @@
+#include <IRremote.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <FastLED.h>
+#include "DHT.h"
+#include <Servo.h>
+
+#define semnal_usa 44
+#define semnal_garaj 42
+#define semnal1 40
+#define LED_PIN     32
+#define NUM_LEDS    20
+
+// DECLARATION OF PINS
+#define STEPPER_PIN_1 9
+#define STEPPER_PIN_2 10
+#define STEPPER_PIN_3 11
+#define STEPPER_PIN_4 12
+#define DHTPIN 4
+#define PIR1 8
+#define PIR2 7
+#define window 50
+#define RECV_PIN 3
+#define piezoPin A6
+#define LED1 22
+#define LED2 23
+#define LED3 24
+#define LED4 25
+#define LED5 26
+#define LED6 27
+#define LED7 28
+#define LED8 29
+#define LED9 30
+#define light 31
+#define trigPin  52
+#define  echoPin 53
+#define TRANZ 49
+#define PIR_TRANZ 48
+//END of PINS DECLARATION
+
+//DECLARATION OF STATES
+#define READ_SERVER 0
+#define ARMED 1
+#define ARMED_SENSORS 2
+#define ALARM 3
+#define DISABLE 4
+#define READ_PHONE 5
+#define READ_PHONE_ARMED 6
+
+int STATE = READ_SERVER ;
+
+//END OF DECLARATION OF STATES
+
+#define DHTTYPE DHT11
+#define TRANSFER 13
+#define OPEN 0
+#define CLOSE 1
+#define rotatie 800
+int step_number = 0;
+int garaj;
+int usa;
+int s = 1;
+int semnal ;
+int e = 1 ;
+int h = 0;
+int regim = 0;
+int a;
+int stare = 0;
+int b ;
+int semn = 0;
+
+IRrecv irrecv(RECV_PIN);
+CRGB leds[NUM_LEDS];
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+decode_results results;
+Servo myservo;
+Servo myservo1;
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+    pinMode(PIR_TRANZ, OUTPUT);
+  pinMode(TRANZ, OUTPUT);
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT);
+  dht.begin();
+  pinMode(semnal_usa , INPUT);
+  pinMode(semnal_garaj , INPUT);
+  pinMode(semnal1, INPUT);
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  pinMode(light, OUTPUT);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
+  pinMode(LED4, OUTPUT);
+  pinMode(LED5, OUTPUT);
+  pinMode(LED6, OUTPUT);
+  pinMode(LED7, OUTPUT);
+  pinMode(LED8, OUTPUT);
+  pinMode(LED9, OUTPUT);
+
+  lcd.init();
+  pinMode(piezoPin, OUTPUT);
+  lcd.backlight();
+  irrecv.enableIRIn();
+  irrecv.blink13(true);
+  myservo1.attach(window);
+  myservo.attach(5);
+  pinMode(PIR1, INPUT);
+  pinMode(PIR2, INPUT);
+  pinMode(TRANSFER, INPUT);
+  pinMode(STEPPER_PIN_1, OUTPUT);
+  pinMode(STEPPER_PIN_2, OUTPUT);
+  pinMode(STEPPER_PIN_3, OUTPUT);
+  pinMode(STEPPER_PIN_4, OUTPUT);
+  Serial.begin(9600);
+
+}
+
+void deschidere(int r) {
+  if (stare == 0) {
+    b = 0;
+
+    while (b < r) {
+
+      digitalWrite(STEPPER_PIN_1, LOW);
+      digitalWrite(STEPPER_PIN_2, LOW);
+      digitalWrite(STEPPER_PIN_3, LOW);
+      digitalWrite(STEPPER_PIN_4, HIGH);
+      delay(5);
+
+      digitalWrite(STEPPER_PIN_1, LOW);
+      digitalWrite(STEPPER_PIN_2, LOW);
+      digitalWrite(STEPPER_PIN_3, HIGH);
+      digitalWrite(STEPPER_PIN_4, LOW);
+      delay(5);
+      digitalWrite(STEPPER_PIN_1, LOW);
+      digitalWrite(STEPPER_PIN_2, HIGH);
+      digitalWrite(STEPPER_PIN_3, LOW);
+      digitalWrite(STEPPER_PIN_4, LOW);
+      delay(5);
+      digitalWrite(STEPPER_PIN_1, HIGH);
+      digitalWrite(STEPPER_PIN_2, LOW);
+      digitalWrite(STEPPER_PIN_3, LOW);
+      digitalWrite(STEPPER_PIN_4, LOW);
+      delay(5);
+      b++;
+    }
+    Serial.println("DESCHIDERE");
+    stare = 1;
+  }
+
+
+}
+
+void inchidere(int r) {
+
+  if (stare == 1) {
+    int b = 0;
+    long duration;
+    int distance;
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    duration = pulseIn(echoPin, HIGH);
+
+    distance = duration * 0.034 / 2;
+    Serial.println(distance);
+
+    if (distance > 16 or distance < 7 ) {
+
+      while (b < r ) {
+
+        digitalWrite(STEPPER_PIN_1, HIGH);
+        digitalWrite(STEPPER_PIN_2, LOW);
+        digitalWrite(STEPPER_PIN_3, LOW);
+        digitalWrite(STEPPER_PIN_4, LOW);
+        delay(5);
+
+        digitalWrite(STEPPER_PIN_1, LOW);
+        digitalWrite(STEPPER_PIN_2, HIGH);
+        digitalWrite(STEPPER_PIN_3, LOW);
+        digitalWrite(STEPPER_PIN_4, LOW);
+        delay(5);
+        digitalWrite(STEPPER_PIN_1, LOW);
+        digitalWrite(STEPPER_PIN_2, LOW);
+        digitalWrite(STEPPER_PIN_3, HIGH);
+        digitalWrite(STEPPER_PIN_4, LOW);
+        delay(5);
+        digitalWrite(STEPPER_PIN_1, LOW);
+        digitalWrite(STEPPER_PIN_2, LOW);
+        digitalWrite(STEPPER_PIN_3, LOW);
+        digitalWrite(STEPPER_PIN_4, HIGH);
+        delay(5);
+        b++ ;
+      }
+      Serial.println("INCHIDERE");
+      stare = 0;
+    }
+  }
+}
+
+void pirSensors(int a , int b) {
+  int val = 0;
+  val = digitalRead(a);
+  if (val == 1) {            // check if the input is HIGH
+    Serial.println();
+    Serial.print("Motion detected in room ");
+    Serial.print(b);
+    alarma();
+  }
+  else 
+  {
+    Serial.println("Clear!");
+  }
+  delay(500);
+}
+
+void lumini_left() {
+  if (regim  == 0 ) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(255, 0, 0);
+      FastLED.show();
+    }
+    regim = 1;
+  } else if (regim == 1) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 255, 0);
+      FastLED.show();
+    }
+    regim = 2;
+  } else if (regim == 2) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 0, 255);
+      FastLED.show();
+    }
+    regim = 3;
+  } else if (regim == 3) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 255, 200);
+      FastLED.show();
+    }
+    regim = 4;
+  } else if (regim == 4) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(255, 119, 0);
+      FastLED.show();
+    }
+    regim = 0;
+  }
+}
+void lumini_right() {
+  if (regim  == 2 ) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(255, 0, 0);
+      FastLED.show();
+    }
+    regim = 1;
+  } else if (regim == 3) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 255, 0);
+      FastLED.show();
+    }
+    regim = 2;
+  } else if (regim == 4) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 0, 255);
+      FastLED.show();
+    }
+    regim = 1;
+  } else if (regim == 1) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 255, 200);
+      FastLED.show();
+    }
+    regim = 0;
+  } else if (regim == 0) {
+    for (int i = 0 ; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(255, 119, 0);
+      FastLED.show();
+    }
+    regim = 4;
+  }
+}
+void alarma() {
+  h = 0;
+  while (h < 15) {
+    delay(100);
+    digitalWrite(LED1 , HIGH);
+    digitalWrite(LED4 , HIGH);
+    digitalWrite(LED7 , HIGH);
+    analogWrite(piezoPin, 250);
+    delay(150);
+    digitalWrite(LED1 , LOW);
+    digitalWrite(LED4 , LOW);
+    digitalWrite(LED7 , LOW);
+    analogWrite(piezoPin,  20);
+    digitalWrite(LED2 , HIGH);
+    digitalWrite(LED5 , HIGH);
+    digitalWrite(LED8 , HIGH);
+    delay(150);
+    digitalWrite(LED2 , LOW);
+    digitalWrite(LED5 , LOW);
+    digitalWrite(LED8 , LOW);
+    analogWrite(piezoPin, 250);
+    digitalWrite(LED3 , HIGH);
+    digitalWrite(LED6 , HIGH);
+    digitalWrite(LED9 , HIGH);
+    delay(150);
+    digitalWrite(LED3 , LOW);
+    digitalWrite(LED6 , LOW);
+    digitalWrite(LED9 , LOW);
+    analogWrite(piezoPin,  20);
+    analogWrite(piezoPin, 0);
+    h++;
+
+  }
+}
+
+
+void loop() {
+
+  if (STATE == READ_SERVER  ) {
+    Serial.println("ReAD_SERVER");
+    semnal = digitalRead(TRANSFER);
+    Serial.println(semnal);
+    semn = digitalRead(semnal1);
+
+    if (semnal == 1 ) // ARMED from Server
+    { if (semn == 0) {
+        STATE = DISABLE;
+        lcd.setCursor(0, 0);
+        lcd.print("  SECURITY: OFF          ");
+        STATE = READ_PHONE_ARMED;
+      } else {
+        STATE = ARMED;
+      }
+    }
+    else if (semnal == 0) //DISABLE from Server
+    { if (semn == 1) {
+        STATE = ARMED;
+      } else {
+
+        STATE = DISABLE;
+      }
+    }
+  }
+  else if (STATE == READ_PHONE_ARMED) {
+    garaj = digitalRead(semnal_garaj);
+    if (garaj == 1 ) {
+      inchidere(750);
+
+    } else
+    { deschidere(750);
+    }
+    usa = digitalRead(semnal_usa);
+    digitalWrite(TRANZ, HIGH);
+    if (usa == 1 )
+    { digitalWrite(TRANZ, HIGH);
+      myservo.write(20);
+    
+    }
+    else
+    { 
+      myservo.write(120);
+      
+    }
+    STATE = READ_SERVER;
+
+  }
+  else if (STATE == READ_PHONE) {
+   
+  
+    garaj = digitalRead(semnal_garaj);
+    if (garaj == 1 ) {
+      inchidere(750);
+
+    } else
+    { deschidere(750);
+    }
+    usa = digitalRead(semnal_usa);
+    if (usa == 1 )
+    {
+      
+       myservo.write(20);
+     
+       }
+    else{
+    
+       myservo.write(120);
+       
+         }
+    STATE = DISABLE;
+  }
+  else if (STATE == ARMED )
+  {
+    digitalWrite(TRANZ,HIGH);
+    myservo.write(20);
+    myservo1.write(70);
+ 
+    inchidere(800);
+    lcd.setCursor(0, 0);
+    lcd.print("  SECURITY: ON    ");
+    STATE = ARMED_SENSORS;
+  }
+  else if (STATE == ARMED_SENSORS)
+  {digitalWrite(PIR_TRANZ , HIGH);
+    pirSensors( PIR1, 1);
+    Serial.println("ReAD_SERVER");
+    pirSensors( PIR2, 2);
+
+    STATE = READ_SERVER;
+    digitalWrite(PIR_TRANZ , LOW);
+  }
+  else if (STATE == ALARM)
+  { Serial.println("ReAD_SERVER");
+    
+    //WIIIII WIIIII WIIIII
+    alarma();
+
+    STATE = READ_SERVER;
+
+  }
+  else if (STATE == DISABLE)
+
+  { semnal = digitalRead(TRANSFER);
+    semn = digitalRead(semnal1); 
+
+    if (semnal == 1 ) // ARMED from Server
+    { if (semn == 0) {
+        STATE = DISABLE;
+      }
+      else {
+
+        STATE = ARMED;
+        lcd.setCursor(0, 0);
+        lcd.print("Armed in 10 seconds     ");
+        Serial.println("ARMED");
+        irrecv.resume();
+
+      }
+    } else {
+
+      lcd.setCursor(0, 0);
+      lcd.print("  SECURITY: OFF          ");
+
+      Serial.println("DISABLE     ");
+
+      if (irrecv.decode(&results)) {
+
+        switch (results.value) {
+          case 0xFFA25D: //buton OFF/OFF
+            STATE = READ_SERVER;
+
+            lcd.setCursor(0, 0);
+            lcd.print("OFF REMOUTE       ");
+            break;
+          case 0xFFE01F:
+
+            lcd.setCursor(0, 0);
+            lcd.print("GARAGE CLOSE     ");
+            Serial.println("GARAGE CLOSE     ");
+
+            inchidere(800);
+
+            break
+          case 0xFF906F:
+            Serial.println("GARAGE OPEN     ");
+
+            lcd.setCursor(0, 0);
+            lcd.print("GARAGE OPEN      ");
+            deschidere(800);
+
+            break;
+          case 0xFF629D:
+            digitalWrite(LED1 , HIGH);
+            digitalWrite(LED2 , HIGH);
+            digitalWrite(LED3 , HIGH);
+            digitalWrite(LED4 , HIGH);
+            digitalWrite(LED5 , HIGH);
+            digitalWrite(LED6 , HIGH);
+            digitalWrite(LED7 , HIGH);
+            digitalWrite(LED8 , HIGH);
+            digitalWrite(LED9 , HIGH);
+            break;
+          case 0xFFA857 :
+            digitalWrite(LED1 , LOW);
+            digitalWrite(LED2 , LOW);
+            digitalWrite(LED3 , LOW);
+            digitalWrite(LED4 , LOW);
+            digitalWrite(LED5 , LOW);
+            digitalWrite(LED6 , LOW);
+            digitalWrite(LED7 , LOW);
+            digitalWrite(LED8 , LOW);
+            digitalWrite(LED9 , LOW);
+            break;
+          case 0xFF02FD:
+            if (e == 1) {
+              digitalWrite(light , HIGH);
+              for (int i; i < NUM_LEDS ; i++)
+              {
+                leds[i] = CRGB(255, 255, 255);
+                FastLED.show();
+              }
+              e = 0;
+            }
+            else {
+              digitalWrite(light , LOW);
+              e = 1;
+            }
+            break;
+          case 0xFFE21D :
+            for (int i = 0; i < NUM_LEDS ; i++)
+            {
+              leds[i] = CRGB(255, 255, 255);
+              FastLED.show();
+            }
+            break;
+          case 0xFF22DD:
+            lumini_left();
+            break;
+          case 0xFFC23D:
+            lumini_right();
+            break;
+          case 0xFFB04F:
+            alarma();
+            break;
+          case 0xFF30CF:// 1
+
+            break;
+          case 0xFF18E7:
+            digitalWrite(TRANZ, HIGH);
+            myservo.write(20);
+            delay(1000);
+            digitalWrite(TRANZ, LOW);
+            break;
+          case  0xFF7A85:
+            digitalWrite(TRANZ, HIGH);
+            myservo.write(120);
+            delay(1000);
+            digitalWrite(TRANZ, LOW);
+            break;
+          case 0xFF10EF:
+            digitalWrite(TRANZ, HIGH);
+            myservo1.write(70);
+            delay(1000);
+            digitalWrite(TRANZ, LOW);
+            break;
+          case  0xFF38C7:
+            digitalWrite(TRANZ, HIGH);
+            myservo1.write(170);
+            delay(1000);
+            digitalWrite(TRANZ, LOW);
+            break;
+
+        }
+        irrecv.resume();
+      }
+    }
+  }
+
+}
